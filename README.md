@@ -1,2 +1,523 @@
 # Leave-one-out-analysis
-Leave one out analysis for aggregate interactome data
+# Leave one out analysis for aggregate interactome data
+
+## Remove comment(#) from all "install.packages" lines before using the code in R
+## Only things to change are the file path and filename in line 13 and line 17
+
+#install.packages("igraph)
+library(igraph)
+
+
+#Script must be in same folder as input files
+
+setwd(".../LOOA_SY5Y_v2/")    ## Enter file path for the location of the code and input file
+directory <- getwd()
+directory
+
+input <- read.csv(paste(directory,"SY5Y_APP_edges.csv", sep = "/"), sep = ",")    ## Enter name of the input file
+
+input
+
+input_graph <- graph.data.frame(input)
+
+
+OG_vertex_list <- V(input_graph)$name
+OG_vertex_list
+
+OG_edge_list <- E(input_graph)
+OG_edge_list
+
+OG_EigenCentr_score <- centr_eigen(input_graph, directed = F, scale = T)$centralization
+OG_DegreeCentr_score <- centr_degree(input_graph, mode= "all", normalized = T)$centralization
+OG_BetweennessCentr_score <- centr_betw(input_graph, directed = F, normalized = T)$centralization
+OG_ClosenessCentr_score <- centr_clo(input_graph, mode = "all", normalized = T)$centralization
+OG_EigenCentr_score
+OG_DegreeCentr_score
+OG_BetweennessCentr_score
+OG_ClosenessCentr_score
+OG_Clustering_Coefficient <- transitivity(input_graph, type = "global", vids = NULL, weights = NULL, isolates = c("NaN", "zero")) #auto includes weights if set to null.
+OG_Clustering_Coefficient
+
+
+
+## LOVO starts....
+
+vertex_results <- data.frame(matrix(ncol=11, nrow = length(OG_vertex_list),
+                                    dimnames=list(NULL, c("Node_Removed",
+                                                          "Eigenvector_Centrality_Score_of_Resultant_Graph",
+                                                          "Degree_Centrality_Score_of_Resultant_Graph",
+                                                          "Betweenness_Centrality_Score_of_Resultant_Graph",
+                                                          "Closeness_Centrality_Score_of_Resultant_Graph",
+                                                          "Clustering_Coefficient_of_Resultant_Graph",
+                                                          "EC_Score_Change_vs_Previous_Graph",
+                                                          "DC_Score_Change_vs_Previous_Graph",
+                                                          "BC_Score_Change_vs_Previous_Graph",
+                                                          "ClosenessC_Score_Change_vs_Previous_Graph",
+                                                          "ClustCoeff_Change_vs_Previous_Graph"))))
+vertex_results$Node_Removed = OG_vertex_list
+vertex_results$EC_Score_of_Vertex = centr_eigen(input_graph, directed = F, scale = T)$vector
+vertex_results$DC_Score_of_Vertex = centr_degree(input_graph, mode= "all", normalized = T)$res
+vertex_results$BC_Score_of_Vertex = centr_betw(input_graph, directed = F, normalized = T)$res
+vertex_results$ClosenessC_Score_of_Vertex = centr_clo(input_graph, mode = "all", normalized = T)$res
+vertex_results$ClustCoeff_Score_of_Vertex = transitivity(input_graph, type = "localundirected", vids = NULL, weights = NULL, isolates = c("NaN", "zero")) #auto includes weights if set to null.
+
+for (i in 1:length(OG_vertex_list)) {
+  start <- Sys.time()  
+  
+  # Make a copy of the OG graph and remove a given node
+  mod_vertex_graph <- delete_vertices(input_graph, OG_vertex_list[i])
+  
+  
+  ##FOR ALL OF THE BELOW CENTRALITY MEASURES, BIGGER IS BETTER!
+  
+  EigenCentr_score <- centr_eigen(mod_vertex_graph, directed = F, scale = T)$centralization
+  # Eigenvector centrality - assigns relative scores to all nodes in the 
+  #   network based on the concept that connections to high-scoring nodes
+  #   contribute more to the score of the node in question than equal 
+  #   connections to low-scoring nodes.
+  
+  DegreeCentr_score <- centr_degree(mod_vertex_graph, mode= "all", normalized = T)$centralization
+  # Degree Centrality - the number of ties that a node has.
+  
+  BetweennessCentr_score <- centr_betw(mod_vertex_graph, directed = F, normalized = T)$centralization
+  # Betweenness Centrality - Betweenness centrality quantifies the
+  #   number of times a node acts as a bridge along the shortest path
+  #   between two other nodes.
+  
+  ClosenessCentr_score <- centr_clo(mod_vertex_graph, mode = "all", normalized = T)$centralization
+  # Closeness Centrality - average length of the shortest path between
+  #   the node and all other nodes in the graph. Thus the more central
+  #   a node is, the closer it is to all other nodes.
+  Clustering_Coefficient <- transitivity(mod_vertex_graph, type = "global", vids = NULL, weights = NULL, isolates = c("NaN", "zero"))
+
+  vertex_results$Eigenvector_Centrality_Score_of_Resultant_Graph[i] = EigenCentr_score
+  vertex_results$Degree_Centrality_Score_of_Resultant_Graph[i] = DegreeCentr_score
+  vertex_results$Betweenness_Centrality_Score_of_Resultant_Graph[i] = BetweennessCentr_score
+  vertex_results$Closeness_Centrality_Score_of_Resultant_Graph[i] = ClosenessCentr_score
+  vertex_results$Clustering_Coefficient_of_Resultant_Graph[i] = Clustering_Coefficient
+  
+  vertex_results$EC_Score_Change_vs_Previous_Graph[i] = EigenCentr_score - OG_EigenCentr_score
+  vertex_results$DC_Score_Change_vs_Previous_Graph[i] = DegreeCentr_score - OG_DegreeCentr_score
+  vertex_results$BC_Score_Change_vs_Previous_Graph[i] = BetweennessCentr_score - OG_BetweennessCentr_score
+  vertex_results$ClosenessC_Score_Change_vs_Previous_Graph[i] = ClosenessCentr_score - OG_ClosenessCentr_score
+  vertex_results$ClustCoeff_Change_vs_Previous_Graph[i] = Clustering_Coefficient - OG_Clustering_Coefficient
+  
+  
+  # Calculate approximate time of completion
+  
+  Time_for_1 <- ((Sys.time() - start)/60)
+  Length <- length(OG_edge_list)
+  Calculation_remaining <- length(OG_vertex_list) - i
+  cat(paste("\n",Calculation_remaining, "calculations remaining \n\n")) 
+  cat(paste("Approximate time remaining for LOVO =", round(Calculation_remaining*Time_for_1, digits = 1), "minutes \n\n"))
+  if(Calculation_remaining == 0) {
+    cat("\n LOVO All done!")
+  }
+}
+
+
+## LOVO all done!!
+
+## PCA for LOVO starts...
+
+
+#install.packages("corrr")
+library('corrr')
+
+#install.packages("corrplot")
+library("corrplot")
+
+#install.packages("ggcorrplot")
+library(ggcorrplot)
+
+#install.packages("FactoMineR")
+library("FactoMineR")
+
+#install.packages("factoextra")
+library(factoextra)
+
+
+## Replace NA values with mean of respective column
+
+vertex_results$ClosenessC_Score_Change_vs_Previous_Graph[is.na(vertex_results$ClosenessC_Score_Change_vs_Previous_Graph)] <- mean(vertex_results$ClosenessC_Score_Change_vs_Previous_Graph, na.rm = T)
+vertex_results$EC_Score_Change_vs_Previous_Graph[is.na(vertex_results$EC_Score_Change_vs_Previous_Graph)] <- mean(vertex_results$EC_Score_Change_vs_Previous_Graph, na.rm = T)
+vertex_results$DC_Score_Change_vs_Previous_Graph[is.na(vertex_results$DC_Score_Change_vs_Previous_Graph)] <- mean(vertex_results$DC_Score_Change_vs_Previous_Graph, na.rm = T)
+vertex_results$BC_Score_Change_vs_Previous_Graph[is.na(vertex_results$BC_Score_Change_vs_Previous_Graph)] <- mean(vertex_results$BC_Score_Change_vs_Previous_Graph, na.rm = T)
+vertex_results$ClustCoeff_Change_vs_Previous_Graph[is.na(vertex_results$ClustCoeff_Change_vs_Previous_Graph)] <- mean(vertex_results$ClustCoeff_Change_vs_Previous_Graph, na.rm = T)
+
+head(vertex_results)
+
+
+LOVO_data <- vertex_results[,7:11]
+Node_Removed <- paste(vertex_results$Node_Removed)
+LOVO_result <- data.frame(Node_Removed, LOVO_data)
+
+str(LOVO_result)
+
+
+colSums(is.na(LOVO_result))
+
+
+numerical_data_LOVO <- LOVO_result[,2:6]
+
+head(numerical_data_LOVO)
+
+data_normalized_LOVO <- scale(numerical_data_LOVO)
+
+head(data_normalized_LOVO)
+
+colnames(data_normalized_LOVO) <- c("EC score influence", "DC score influence", "BC score influence", "CC score influence", "GCC score influence")
+head(data_normalized_LOVO)
+
+corr_matrix_v <- cor(data_normalized_LOVO)
+par(mar=c(10,4,4,4))
+tiff(filename = "corr_plot_v.tiff", width = 5, height = 5, units = "in", res = 300)
+corr_plot_v <- ggcorrplot(corr_matrix_v)
+corr_plot_v
+
+dev.off()
+
+
+#Perform PCA
+
+pca_v <- PCA(data_normalized_LOVO, graph = F)
+print(pca_v)
+
+pca_v
+
+var_v <- pca_v$var
+var_v
+
+
+#PCA components and make a new dataframe with PCA components' values
+
+pr_out_v <- prcomp(data_normalized_LOVO, scale = T)
+pr_out_v
+
+PCA_comp_LOVO <- pr_out_v$x
+PCA_comp_LOVO
+PCA_comp_LOVO <- as.data.frame(PCA_comp_LOVO)
+
+
+#Get eigenvalues/variances for determining number of components to consider and plotting
+
+eig.val_v <- get_eigenvalue(pca_v)
+eig.val_v
+eig_val_v_df <- as.data.frame(eig.val_v)
+eig_val_v_df
+
+
+eig_var_v <- data.frame(Dim = c("Dim1", "Dim2", "Dim3", "Dim4", "Dim5"), Eigenvalue = eig_val_v_df$eigenvalue, Cummulative_variance_percent = eig_val_v_df$cumulative.variance.percent)
+eig_var_v
+
+
+var_per <- format(round(eig_val_v_df$variance.percent, 2))
+var_per
+
+
+
+
+
+#Eigenvalue and Percent of variance explained as bar labels
+
+
+tiff(filename = "eigenvalue_v.tiff", width = 5, height = 5, units = "in", res = 300)
+p <- barplot(eig_var_v$Eigenvalue, names.arg = eig_var_v$Dim, cex.names = 1, las = 1, 
+        main = "Eigenvalues and variance explained \n for each dimension for LOVO", ylab = "Eigenvalue", ylim = range(pretty(c(0,eig_var_v$Eigenvalue))), col = rainbow(10))
+text(x = p, y = eig_var_v$Eigenvalue + 0.08, label = var_per, cex = 1, font = 2)
+title(xlab = "Dimensions", line = 5)
+axis(side = 1, lwd = 2, lwd.ticks = 0, labels = F)
+
+dev.off()
+
+#Choose all components that eigenvalue greater than or equal to 1 and individual explained variance greater than 10%, and do a sum of those components to find final influence value
+
+for (i in 1:nrow(pr_out_v$x)) {
+  if (eig_val_v_df$eigenvalue[3] >= 1 | eig_val_v_df$variance.percent[3] >= 10 ) {
+    PCA_comp_LOVO$final_influence[i] <- PCA_comp_LOVO$PC1[i] + PCA_comp_LOVO$PC2[i]+ PCA_comp_LOVO$PC3[i]
+  } else if (eig_val_v_df$eigenvalue[2] >= 1 | eig_val_v_df$variance.percent[2] >= 10) {
+    PCA_comp_LOVO$final_influence[i] <- PCA_comp_LOVO$PC1[i] + PCA_comp_LOVO$PC2[i] 
+  } else {
+    PCA_comp_LOVO$final_influence[i] <- PCA_comp_LOVO$PC1[i]
+  }
+}
+
+PCA_comp_LOVO
+
+#Plot of cos2, quality of representation of the network properties
+
+cos2_v <- var_v$cos2
+cos2_v
+
+
+tiff(filename = "Cos2_v.tiff", width = 5, height = 6, units = "in", res = 300)
+par(mar=c(10,4,4,4))
+cos2_plot_v <- corrplot(t(cos2_v), addCoef.col = ifelse(t(cos2_v) >= 0.7, 'yellow', 'black'), is.corr = F)
+cos2_plot_v
+dev.off()
+
+#Biplot and cos2 plot
+
+
+tiff(filename = "Cos2_biplot_v.tiff", width = 5, height = 5, units = "in", res = 300)
+par(mar=c(10,4,4,4))
+biplot_cos2_plot_v <- fviz_pca_var(pca_v, col.var = "cos2", gradient.cols = c("blue", "white", "red"), repel = T)
+biplot_cos2_plot_v
+dev.off()
+
+
+# Final influence file and top10 influential plot
+
+Influence_after_LOVO <- data.frame(Node_Removed,PCA_comp_LOVO)
+
+
+Influence_after_LOVO_sorted <- Influence_after_LOVO[order(Influence_after_LOVO$final_influence, decreasing = T),]
+Influence_after_LOVO_sorted
+
+
+tiff(filename = "Top 10 Influential vertices.tiff", width = 5, height = 5, units = "in", res = 300)
+par(mar=c(10,4,4,4))
+Top10Influence_v <- barplot(Influence_after_LOVO_sorted$final_influence[1:10], names.arg = Influence_after_LOVO_sorted$Node_Removed[1:10], cex.names = 0.5, las = 2, 
+                  main = "Top 10 influential proteins", ylab = "Influence score", ylim = range(pretty(c(0,Influence_after_LOVO_sorted$final_influence[1:10]))), col = rainbow(10))
+title(xlab = "Nodes", line = 5)
+axis(side = 1, lwd = 2, lwd.ticks = 0, labels = F)
+dev.off()
+
+
+Influence_LOVO <- data.frame(select(Influence_after_LOVO_sorted, Node_Removed, final_influence))
+
+write.csv(Influence_LOVO, "PCA_components_for_SY5Y_APP_LOVO.csv")
+
+
+
+## LOVO all done!
+
+## LOEO starts...
+
+
+edge_results <- data.frame(matrix(ncol=6, nrow = length(OG_edge_list),
+                             dimnames=list(NULL, c("Edge_Removed",
+                                                   "DC_score",
+                                                   "Clustcoeff_score",
+                                                   "Closeness_score",
+                                                   "EC_Score",
+                                                   "BC_Score"))))
+
+edge_results$Edge_Removed = OG_edge_list
+edge_results$Clustcoeff_score = transitivity(input_graph, type="global")
+edge_results$EC_Score = centr_eigen(input_graph, directed = F, scale = T)$centralization
+edge_results$DC_Score = centr_degree(input_graph, mode= "all", normalized = T)$centralization
+edge_results$BC_Score = centr_betw(input_graph, directed = F, normalized = T)$centralization
+edge_results$Closeness_score = centr_clo(input_graph, mode = "total", normalized = T)$centralization
+
+
+for (i in 1:length(OG_edge_list)) {
+    start <- Sys.time()
+    
+    mod_edge_graph <- delete_edges(input_graph, OG_edge_list[i])
+    
+    ##FOR ALL OF THE BELOW CENTRALITY MEASURES, BIGGER IS BETTER!
+    
+   EigenCentr_score <- centr_eigen(mod_edge_graph, directed = F, scale = T)$centralization
+    # Eigenvector centrality - assigns relative scores to all nodes in the 
+    #   network based on the concept that connections to high-scoring nodes
+    #   contribute more to the score of the node in question than equal 
+    #   connections to low-scoring nodes.
+    
+   DegreeCentr_score <- centr_degree(mod_edge_graph, mode= "all", normalized = T)$centralization
+    # Degree Centrality - the number of ties that a node has.
+    
+   BetweennessCentr_score <- centr_betw(mod_edge_graph, directed = F, normalized = T)$centralization
+    # Betweenness Centrality - Betweenness centrality quantifies the
+    #   number of times a node acts as a bridge along the shortest path
+    #   between two other nodes.
+    
+   ClosenessCentr_score <- centr_clo(mod_edge_graph, mode = "all", normalized = T)$centralization
+    # Closeness Centrality - average length of the shortest path between
+    #   the node and all other nodes in the graph. Thus the more central
+    #   a node is, the closer it is to all other nodes.
+    
+   Clustering_Coefficient <- transitivity(mod_edge_graph, type = "global", vids = NULL, weights = NULL, isolates = c("NaN", "zero"))
+    
+    
+    
+    edge_results$Eigenvector_Centrality_Score_of_Resultant_Graph[i] = EigenCentr_score
+    edge_results$Degree_Centrality_Score_of_Resultant_Graph[i] = DegreeCentr_score
+    edge_results$Betweenness_Centrality_Score_of_Resultant_Graph[i] = BetweennessCentr_score
+    edge_results$Closeness_Centrality_Score_of_Resultant_Graph[i] = ClosenessCentr_score
+    edge_results$Clustering_Coefficient_of_Resultant_Graph[i] = Clustering_Coefficient
+ 
+    edge_results$EC_Score_Change_vs_Previous_Graph[i] = EigenCentr_score - OG_EigenCentr_score
+    edge_results$DC_Score_Change_vs_Previous_Graph[i] = DegreeCentr_score - OG_DegreeCentr_score
+    edge_results$BC_Score_Change_vs_Previous_Graph[i] = BetweennessCentr_score - OG_BetweennessCentr_score
+    edge_results$ClosenessC_Score_Change_vs_Previous_Graph[i] = ClosenessCentr_score - OG_ClosenessCentr_score
+    edge_results$ClustCoeff_Change_vs_Previous_Graph[i] = Clustering_Coefficient - OG_Clustering_Coefficient
+    
+    # Calculate approximate time of completion
+    Time_for_1 <- ((Sys.time() - start)/60)
+    Length <- length(OG_edge_list)
+    Calculation_remaining <- length(OG_edge_list) - i
+    cat(paste("\n",Calculation_remaining, "calculations remaining \n\n")) 
+    cat(paste("Approximate time remaining for LOEO =", round(Calculation_remaining*Time_for_1, digits = 1), "minutes \n\n"))
+    if(Calculation_remaining == 0) {
+      cat("\n LOEO All done!")
+    }
+     
+}
+  
+
+## LOEO done!!
+
+## PCA for LOEO starts...
+
+
+
+edge_results$ClosenessC_Score_Change_vs_Previous_Graph[is.na(edge_results$ClosenessC_Score_Change_vs_Previous_Graph)] <- mean(edge_results$ClosenessC_Score_Change_vs_Previous_Graph, na.rm = T)
+edge_results$EC_Score_Change_vs_Previous_Graph[is.na(edge_results$EC_Score_Change_vs_Previous_Graph)] <- mean(edge_results$EC_Score_Change_vs_Previous_Graph, na.rm = T)
+edge_results$DC_Score_Change_vs_Previous_Graph[is.na(edge_results$DC_Score_Change_vs_Previous_Graph)] <- mean(edge_results$DC_Score_Change_vs_Previous_Graph, na.rm = T)
+edge_results$BC_Score_Change_vs_Previous_Graph[is.na(edge_results$BC_Score_Change_vs_Previous_Graph)] <- mean(edge_results$BC_Score_Change_vs_Previous_Graph, na.rm = T)
+edge_results$ClustCoeff_Change_vs_Previous_Graph[is.na(edge_results$ClustCoeff_Change_vs_Previous_Graph)] <- mean(edge_results$ClustCoeff_Change_vs_Previous_Graph, na.rm = T)
+
+
+
+head(edge_results)
+
+LOEO_data <- edge_results[,13:17]
+Edge_Removed <- paste(input$Source, "_", input$Target)
+LOEO_result <- data.frame(Edge_Removed, LOEO_data)
+
+str(LOEO_data)
+
+
+colSums(is.na(LOEO_data))
+
+
+numerical_data_e <- LOEO_result[,2:6]
+
+head(numerical_data_e)
+
+data_normalized_e <- scale(numerical_data_e)
+
+head(data_normalized_e)
+
+colnames(data_normalized_e) <- c("EC score influence", "DC score influence", "BC score influence", "CC score influence", "GCC score influence")
+head(data_normalized_e)
+
+corr_matrix_e <- cor(data_normalized_e)
+par(mar=c(10,4,4,4))
+tiff(filename = "corr_plot_e.tiff", width = 5, height = 5, units = "in", res = 300)
+corr_plot_e <- ggcorrplot(corr_matrix_e)
+corr_plot_e
+
+dev.off()
+
+
+#Perform PCA
+
+pca_e <- PCA(data_normalized_e, graph = F)
+print(pca_e)
+
+pca_e
+
+var_e <- pca_e$var
+var_e
+
+#PCA components and make a new dataframe with PCA components' values
+
+pr_out_e <- prcomp(data_normalized_e, scale = T)
+pr_out_e
+
+PCA_comp_LOEO <- pr_out_e$x
+PCA_comp_LOEO
+PCA_comp_LOEO <- as.data.frame(PCA_comp_LOEO)
+
+
+#Get eigenvalues/variances for determining number of components to consider and plotting
+
+eig.val_e <- get_eigenvalue(pca_e)
+eig.val_e
+eig_val_e_df <- as.data.frame(eig.val_e)
+eig_val_e_df
+
+
+eig_var_e <- data.frame(Dim = c("Dim1", "Dim2", "Dim3", "Dim4", "Dim5"), Eigenvalue = eig_val_e_df$eigenvalue, Cummulative_variance_percent = eig_val_e_df$cumulative.variance.percent)
+eig_var_e
+
+
+var_per_e <- format(round(eig_val_e_df$variance.percent, 2))
+var_per_e
+
+
+
+#Eigenvalue and Percent of variance explained as bar labels
+
+
+tiff(filename = "eigenvalue_e.tiff", width = 5, height = 5, units = "in", res = 300)
+p_e <- barplot(eig_var_e$Eigenvalue, names.arg = eig_var_e$Dim, cex.names = 1, las = 1, 
+             main = "Eigenvalues and variance explained \n for each dimension for LOEO", ylab = "Eigenvalue", ylim = range(pretty(c(0,eig_var_e$Eigenvalue))), col = rainbow(10))
+text(x = p_e, y = eig_var_e$Eigenvalue + 0.08, label = var_per_e, cex = 1, font = 2)
+title(xlab = "Dimensions", line = 5)
+axis(side = 1, lwd = 2, lwd.ticks = 0, labels = F)
+
+dev.off()
+
+#Choose all components that eigenvalue greater than or equal to 1 and individual varirance greater than 10%, and do a sum of those components to find final influence value
+
+for (i in 1:nrow(pr_out_e$x)) {
+  if (eig_val_e_df$eigenvalue[3] >= 1 | eig_val_v_df$variance.percent[3] >= 10 ) {
+    PCA_comp_LOEO$final_influence[i] <- PCA_comp_LOEO$PC1[i] + PCA_comp_LOEO$PC2[i]+ PCA_comp_LOEO$PC3[i]
+  } else if (eig_val_e_df$eigenvalue[2] >= 1 | eig_val_v_df$variance.percent[2] >= 10) {
+    PCA_comp_LOEO$final_influence[i] <- PCA_comp_LOEO$PC1[i] + PCA_comp_LOEO$PC2[i] 
+  } else {
+    PCA_comp_LOEO$final_influence[i] <- PCA_comp_LOEO$PC1[i]
+  }
+}
+
+PCA_comp_LOEO
+
+#Plot of cos2, quality of representation of the network properties
+
+cos2_e <- var_e$cos2
+cos2_e
+
+
+tiff(filename = "Cos2_e.tiff", width = 5, height = 6, units = "in", res = 300 )
+par(mar=c(10,4,4,4))
+cos2_plot_e <- corrplot(t(cos2_e), addCoef.col = ifelse(t(cos2_e) >= 0.69, 'yellow', 'black'), is.corr = F)
+cos2_plot_e
+dev.off()
+
+#Biplot and cos2 plot
+
+
+tiff(filename = "Cos2_biplot_e.tiff", width = 5, height = 5, units = "in", res = 300)
+par(mar=c(10,4,4,4))
+biplot_cos2_plot_e <- fviz_pca_var(pca_e, col.var = "cos2", gradient.cols = c("blue", "green", "red"), repel = T)
+biplot_cos2_plot_e
+dev.off()
+
+
+# Final influence file and top10 influential plot
+
+Influence_after_LOEO <- data.frame(Edge_Removed,PCA_comp_LOEO)
+
+
+Influence_after_LOEO_sorted <- Influence_after_LOEO[order(Influence_after_LOEO$final_influence, decreasing = T),]
+Influence_after_LOEO_sorted
+
+tiff(filename = "Top 10 Influential protein-protein interactions.tiff", width = 5, height = 5, units = "in", res = 300)
+par(mar=c(10,4,4,4))
+Top10Influence_e <- barplot(Influence_after_LOEO_sorted$final_influence[1:10], names.arg = Influence_after_LOEO_sorted$Edge_Removed[1:10], cex.names = 0.5, las = 2, 
+    main = "Top 10 influential protein-protein interactions", ylab = "Influence score", ylim = range(pretty(c(0,Influence_after_LOEO_sorted$final_influence[1:10]))), col = rainbow(10))
+title(xlab = "Edges", line = 5)
+axis(side = 1, lwd = 2, lwd.ticks = 0, labels = F)
+dev.off()
+
+Influence_LOEO <- data.frame(select(Influence_after_LOEO_sorted, Edge_Removed, final_influence))
+
+
+write.csv(Influence_LOEO, "PCA_components_for_SY5Y_APP_LOEO.csv")
+
+
+
+
