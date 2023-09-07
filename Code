@@ -10,7 +10,7 @@ library(igraph)
 
 #Script must be in same folder as input files
 
-setwd("C:/Users/Nirjal/Documents/LOOA_SY5Y_v2/")
+setwd(".../LOOA_SY5Y_v2/")
 directory <- getwd()
 directory
 
