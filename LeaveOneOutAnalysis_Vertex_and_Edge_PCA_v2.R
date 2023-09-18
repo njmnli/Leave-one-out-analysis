@@ -1,36 +1,6 @@
-#source('http://bioconductor.org/biocLite.R')
-#library(statmod)
-#library(data.table)
-#library(Matrix)
-#library(matrixStats)
+#install.packages("igraph")
 library(igraph)
-#devtools::install_github("analyxcompany/ForceAtlas2")
-#install.packages("network")
-#install.packages("sna")
- #install.packages("ggraph")
- #install.packages("visNetwork")
- #install.packages("threejs")
- #install.packages("networkD3")
-#install.packages("animation")
-#install.packages("ndtv")
-#install.packages("gplots")
-#install.packages("sigmajs")
-library("network")
-library("sna")
-library("ggraph")
-library("visNetwork")
-library("threejs")
-library("networkD3")
-#library("ndtv")
-library(doParallel)
-library(openxlsx)
-library(gplots)
-library(sigmajs)
-#library(qgraph)
-#install.packages("rgl", configure.args = "--disable-ftgl")
-library(rgl)
-library(ForceAtlas2)
-library(tcltk2)
+
 
 #Script must be in same folder as input files
 
@@ -171,6 +141,9 @@ library("FactoMineR")
 
 #install.packages("factoextra")
 library(factoextra)
+
+#install.packages("dplyr")
+library(dplyr)
 
 
 vertex_results$ClosenessC_Score_Change_vs_Previous_Graph[is.na(vertex_results$ClosenessC_Score_Change_vs_Previous_Graph)] <- mean(vertex_results$ClosenessC_Score_Change_vs_Previous_Graph, na.rm = T)
